@@ -1,0 +1,26 @@
+{
+    "model_type": "GanodermaCNN",
+    "backbone": "resnet50",
+    "num_classes": 3,
+    "classes": [
+        "Healthy",
+        "Infected",
+        "Initial Infection"
+    ],
+    "image_size": [
+        160,
+        160
+    ],
+    "pretrained": true,
+    "test_accuracy": 0.7714285714285715,
+    "test_loss": 0.5300519085592694,
+    "training_date": "2026-08-27T20:24:58.017741",
+    "total_parameters": 24689219,
+    "training_config": {
+        "batch_size": 4,
+        "learning_rate": 0.0001,
+        "num_epochs": 100,
+        "optimizer": "AdamW",
+        "weight_decay": 1e-05
+    }
+}

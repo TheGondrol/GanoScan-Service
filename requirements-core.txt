@@ -1,0 +1,10 @@
+# Minimal deps to run the API in MOCK mode (no trained model yet).
+# Use this to integrate the Android app before training finishes:
+#   pip install -r requirements-core.txt
+#   uvicorn app:app --host 0.0.0.0 --port 5005   (or: python app.py)
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+pydantic-settings==2.3.4
+Pillow==10.4.0
+numpy==1.26.4

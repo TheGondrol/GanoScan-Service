@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ganoscan-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      # Set these to the SAME values already baked into the Android app
+      # (GanoScan/app/.../network/ApiClient.kt) — sync: false means Render
+      # will prompt for the value instead of storing it in this file.
+      - key: GANOSCAN_API_KEY
+        sync: false
+      - key: GANOSCAN_ADMIN_TOKEN
+        sync: false

@@ -9,13 +9,14 @@ from app.core.config import settings
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
-    id            TEXT PRIMARY KEY,
-    created_at    TEXT NOT NULL,
-    verdict       TEXT NOT NULL,
-    confidence    REAL NOT NULL,
-    tree_id       TEXT,
-    block         TEXT,
-    data          TEXT NOT NULL
+    id              TEXT PRIMARY KEY,
+    created_at      TEXT NOT NULL,
+    verdict         TEXT NOT NULL,
+    confidence      REAL NOT NULL,
+    tree_id         TEXT,
+    block           TEXT,
+    predicted_class TEXT,
+    data            TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_scans_created ON scans(created_at DESC);
 """
@@ -35,13 +36,27 @@ def _conn():
 def init_db():
     with _conn() as conn:
         conn.executescript(_SCHEMA)
+        # Migrate a pre-existing DB (created before predicted_class existed):
+        # add the column, then backfill it from each row's stored JSON.
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(scans)")}
+        if "predicted_class" not in cols:
+            conn.execute("ALTER TABLE scans ADD COLUMN predicted_class TEXT")
+        rows = conn.execute("SELECT id, data FROM scans WHERE predicted_class IS NULL").fetchall()
+        for row in rows:
+            predicted_class = json.loads(row["data"]).get("predictedClass")
+            if predicted_class:
+                conn.execute(
+                    "UPDATE scans SET predicted_class = ? WHERE id = ?",
+                    (predicted_class, row["id"]),
+                )
 
 
 def insert_scan(scan: dict):
     with _conn() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO scans (id, created_at, verdict, confidence, tree_id, block, data)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO scans"
+            " (id, created_at, verdict, confidence, tree_id, block, predicted_class, data)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 scan["id"],
                 scan["createdAt"],
@@ -49,6 +64,7 @@ def insert_scan(scan: dict):
                 scan["confidence"],
                 scan.get("treeId"),
                 scan.get("block"),
+                scan.get("predictedClass"),
                 json.dumps(scan),
             ),
         )
@@ -105,16 +121,20 @@ def delete_scans(verdict: str | None = None, before: str | None = None) -> list[
 
 
 def stats() -> dict:
+    """Counts by the model's real 3-way predicted_class, not the collapsed
+    binary verdict column (which only distinguishes healthy/not-healthy)."""
     with _conn() as conn:
         row = conn.execute(
             "SELECT "
             "COUNT(*) AS total, "
-            "SUM(CASE WHEN verdict='HEALTHY' THEN 1 ELSE 0 END) AS healthy, "
-            "SUM(CASE WHEN verdict='INFECTED' THEN 1 ELSE 0 END) AS infected "
+            "SUM(CASE WHEN predicted_class='Healthy' THEN 1 ELSE 0 END) AS healthy, "
+            "SUM(CASE WHEN predicted_class='Initial Infection' THEN 1 ELSE 0 END) AS initial_infection, "
+            "SUM(CASE WHEN predicted_class='Infected' THEN 1 ELSE 0 END) AS infected "
             "FROM scans"
         ).fetchone()
     return {
         "totalScan": row["total"] or 0,
         "totalHealthy": row["healthy"] or 0,
+        "totalInitialInfection": row["initial_infection"] or 0,
         "totalInfected": row["infected"] or 0,
     }

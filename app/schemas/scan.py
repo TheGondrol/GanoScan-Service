@@ -56,6 +56,7 @@ class DeleteManyResult(BaseModel):
 class Stats(BaseModel):
     totalScan: int
     totalHealthy: int
+    totalInitialInfection: int
     totalInfected: int
 
 

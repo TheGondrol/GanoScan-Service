@@ -548,6 +548,9 @@ components:
         totalHealthy:
           type: integer
           title: Totalhealthy
+        totalInitialInfection:
+          type: integer
+          title: Totalinitialinfection
         totalInfected:
           type: integer
           title: Totalinfected
@@ -555,6 +558,7 @@ components:
       required:
       - totalScan
       - totalHealthy
+      - totalInitialInfection
       - totalInfected
       title: Stats
     ValidationError:

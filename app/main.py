@@ -31,7 +31,7 @@ def create_app() -> FastAPI:
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
 
     app = FastAPI(
-        title="GanoScan Backend",
+        title="GanoScan Service",
         version="1.0.0",
         description="Ganoderma detection inference + scan history for the GanoScan Android app.",
         lifespan=lifespan,

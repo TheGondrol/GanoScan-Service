@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: GanoScan Backend
+  title: GanoScan Service
   description: Ganoderma detection inference + scan history for the GanoScan Android app.
   version: 1.0.0
 servers:

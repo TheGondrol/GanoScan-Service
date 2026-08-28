@@ -17,7 +17,7 @@ router = APIRouter(tags=["meta"])
 async def health(model: GanodermaModel = Depends(model_dep)):
     return {
         "status": "ok",
-        "service": "ganoscan-backend",
+        "service": "ganoscan-service",
         "version": "1.0.0",
         "model": model.info(),
     }

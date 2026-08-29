@@ -1,5 +1,5 @@
 """Response models. Field names are camelCase to match the Android app's JSON
-contract exactly (the dicts we build/store already use these keys)."""
+contract exactly (the dicts we build already use these keys)."""
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,9 +18,10 @@ class Stage(BaseModel):
 
 
 class ScanResult(BaseModel):
-    id: str
-    treeId: str
-    block: str
+    """The full /predict response. Stateless — no id/timestamp/image-url
+    fields, since the service persists nothing; the client owns its own
+    history and generates whatever local identifiers it needs."""
+
     verdict: str
     label: str
     predictedClass: str
@@ -31,33 +32,7 @@ class ScanResult(BaseModel):
     inputResolution: str
     recommendations: list[str]
     stages: list[Stage]
-    imageUrl: str | None = None
-    createdAt: str
-    time: str
-    dateLabel: str
-    dayGroup: str
     mock: bool
-
-
-class HistoryResponse(BaseModel):
-    scans: list[ScanResult]
-    count: int
-
-
-class DeleteOneResult(BaseModel):
-    deleted: bool
-    id: str
-
-
-class DeleteManyResult(BaseModel):
-    deleted: int
-
-
-class Stats(BaseModel):
-    totalScan: int
-    totalHealthy: int
-    totalInitialInfection: int
-    totalInfected: int
 
 
 class ModelInfo(BaseModel):

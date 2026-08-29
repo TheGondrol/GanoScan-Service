@@ -22,14 +22,10 @@ git push -u origin main
 1. [render.com](https://render.com) → **New** → **Blueprint**.
 2. Connect the GitHub repo you just pushed.
 3. Render reads `render.yaml` and shows one service: `ganoscan-service`.
-4. It'll prompt for the two env vars marked `sync: false` — paste in the
-   **exact same values** already hardcoded in the Android app so it keeps
-   working without a rebuild:
-   - `GANOSCAN_API_KEY` → `ApiClient.API_KEY` in
-     `GanoScan/app/src/main/java/com/ganoscan/app/network/ApiClient.kt`
-   - `GANOSCAN_ADMIN_TOKEN` → whatever you set in your local `.env`
-     (only needed if you actually plan to call the `DELETE` endpoints
-     against the deployed service)
+4. It'll prompt for the env var marked `sync: false` — paste in the
+   **exact same value** already hardcoded in the Android app so it keeps
+   working without a rebuild: `GANOSCAN_API_KEY` → `ApiClient.API_KEY` in
+   `GanoScan/app/src/main/java/com/ganoscan/app/network/ApiClient.kt`
 5. Deploy. First build installs torch/torchvision/opencv — expect several
    minutes, not seconds.
 6. Check it worked: `curl https://ganoscan-service.onrender.com/health` should
@@ -67,8 +63,10 @@ with two things that matter specifically for a torch+opencv service:
   out-of-memory kill before assuming it's a code bug. Current RAM/CPU specs
   are on Render's pricing page — they've changed over time, so don't rely on
   a number from anywhere else, including this file.
-- **No persistent disk option at all on free** (Disks require a paid plan)
-  — see the section below, which already assumed this.
+
+The disk itself isn't a concern either way: the service is stateless (no DB,
+no stored images), so there's nothing that needs to survive a redeploy or
+restart on the server side. Every request is independent.
 
 ## Why the model files are committed to git
 
@@ -79,30 +77,3 @@ to allow exactly `models/model_jit.pt`, `models/best_model.pth`, and
 weight files are individually under GitHub's 100MB hard limit but over its
 50MB warning threshold — that warning is expected and harmless here. If you
 retrain and the files grow past 100MB, you'd need Git LFS instead.
-
-## The one real gap: no persistent disk by default
-
-Render's default web service disk is **ephemeral** — `scans.db` and
-`uploads/` (created fresh inside the container at startup) are wiped on
-every redeploy or restart. The model files are fine (they're baked into the
-image itself, not runtime state), but scan history is not.
-
-If you need history to survive redeploys, add a
-[Render Disk](https://render.com/docs/disks) (paid — check current pricing
-on your dashboard) and point the app at it via env vars:
-
-```yaml
-# add under the service in render.yaml
-disk:
-  name: ganoscan-data
-  mountPath: /app/data
-  sizeGB: 1
-```
-```bash
-# additional env vars
-GANOSCAN_DB=/app/data/scans.db
-GANOSCAN_UPLOADS=/app/data/uploads
-```
-
-Without this, the service still works fine for demoing predictions — it just
-starts with an empty history after every redeploy/restart.

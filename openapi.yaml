@@ -1,7 +1,8 @@
 openapi: 3.1.0
 info:
   title: GanoScan Service
-  description: Ganoderma detection inference + scan history for the GanoScan Android app.
+  description: Stateless Ganoderma detection inference for the GanoScan Android app. Nothing is persisted
+    server-side — the app owns its own scan history.
   version: 1.0.0
 servers:
 - url: http://127.0.0.1:5005
@@ -25,7 +26,10 @@ paths:
     post:
       tags:
       - inference
-      summary: Classify an uploaded photo and persist the scan
+      summary: Classify an uploaded photo
+      description: 'Classifies the uploaded image and returns the result. Stateless: nothing
+
+        is persisted server-side — the client is responsible for its own history.'
       operationId: predict
       requestBody:
         content:
@@ -34,7 +38,7 @@ paths:
               $ref: '#/components/schemas/Body_predict'
         required: true
       responses:
-        '201':
+        '200':
           description: Successful Response
           content:
             application/json:
@@ -68,230 +72,6 @@ paths:
                 $ref: '#/components/schemas/ErrorDetail'
       security:
       - APIKeyHeader: []
-  /history:
-    get:
-      tags:
-      - scans
-      summary: List scans, newest first
-      operationId: listHistory
-      security:
-      - APIKeyHeader: []
-      parameters:
-      - name: verdict
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            pattern: ^(HEALTHY|INFECTED)$
-          - type: 'null'
-          title: Verdict
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          maximum: 500
-          minimum: 1
-          default: 100
-          title: Limit
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HistoryResponse'
-        '401':
-          description: Missing or invalid X-API-Key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-  /scan/{scan_id}:
-    get:
-      tags:
-      - scans
-      summary: Get one scan by id
-      operationId: getScan
-      security:
-      - APIKeyHeader: []
-      parameters:
-      - name: scan_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Scan Id
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ScanResult'
-        '401':
-          description: Missing or invalid X-API-Key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '404':
-          description: No scan with this id
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-    delete:
-      tags:
-      - scans
-      summary: Delete one scan and its stored photo
-      operationId: deleteScan
-      security:
-      - APIKeyHeader: []
-      parameters:
-      - name: scan_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Scan Id
-      - name: x-admin-token
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Admin-Token
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeleteOneResult'
-        '401':
-          description: Missing/invalid X-API-Key, or (if configured) X-Admin-Token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '404':
-          description: No scan with this id
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-  /stats:
-    get:
-      tags:
-      - scans
-      summary: Aggregate scan counts
-      operationId: getStats
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Stats'
-        '401':
-          description: Missing or invalid X-API-Key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-      security:
-      - APIKeyHeader: []
-  /scans:
-    delete:
-      tags:
-      - scans
-      summary: Bulk delete scans (and their photos)
-      operationId: deleteScans
-      security:
-      - APIKeyHeader: []
-      parameters:
-      - name: verdict
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-            pattern: ^(HEALTHY|INFECTED)$
-          - type: 'null'
-          title: Verdict
-      - name: before
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: ISO datetime; deletes scans created before this
-          title: Before
-        description: ISO datetime; deletes scans created before this
-      - name: all
-        in: query
-        required: false
-        schema:
-          type: boolean
-          description: Required (=true) to delete with no filters at all
-          default: false
-          title: All
-        description: Required (=true) to delete with no filters at all
-      - name: x-admin-token
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Admin-Token
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeleteManyResult'
-        '400':
-          description: No filters given and all=true not passed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '401':
-          description: Missing/invalid X-API-Key, or (if configured) X-Admin-Token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorDetail'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     Body_predict:
@@ -301,44 +81,10 @@ components:
           format: binary
           title: Image
           description: Leaf/stem photo (jpg, jpeg, png, bmp or webp)
-        treeId:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Treeid
-          description: 'e.g. ''Pohon #A-142''; defaults to ''Pohon #<generated id>'''
-        block:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Block
-          description: e.g. 'Blok C'; defaults to GANOSCAN_DEFAULT_BLOCK
       type: object
       required:
       - image
       title: Body_predict
-    DeleteManyResult:
-      properties:
-        deleted:
-          type: integer
-          title: Deleted
-      type: object
-      required:
-      - deleted
-      title: DeleteManyResult
-    DeleteOneResult:
-      properties:
-        deleted:
-          type: boolean
-          title: Deleted
-        id:
-          type: string
-          title: Id
-      type: object
-      required:
-      - deleted
-      - id
-      title: DeleteOneResult
     ErrorDetail:
       properties:
         detail:
@@ -349,15 +95,6 @@ components:
       - detail
       title: ErrorDetail
       description: Shape of every error response (FastAPI's default HTTPException body).
-    HTTPValidationError:
-      properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          type: array
-          title: Detail
-      type: object
-      title: HTTPValidationError
     Health:
       properties:
         status:
@@ -378,21 +115,6 @@ components:
       - version
       - model
       title: Health
-    HistoryResponse:
-      properties:
-        scans:
-          items:
-            $ref: '#/components/schemas/ScanResult'
-          type: array
-          title: Scans
-        count:
-          type: integer
-          title: Count
-      type: object
-      required:
-      - scans
-      - count
-      title: HistoryResponse
     ModelInfo:
       properties:
         mode:
@@ -433,15 +155,6 @@ components:
       title: ModelInfo
     ScanResult:
       properties:
-        id:
-          type: string
-          title: Id
-        treeId:
-          type: string
-          title: Treeid
-        block:
-          type: string
-          title: Block
         verdict:
           type: string
           title: Verdict
@@ -478,31 +191,11 @@ components:
             $ref: '#/components/schemas/Stage'
           type: array
           title: Stages
-        imageUrl:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Imageurl
-        createdAt:
-          type: string
-          title: Createdat
-        time:
-          type: string
-          title: Time
-        dateLabel:
-          type: string
-          title: Datelabel
-        dayGroup:
-          type: string
-          title: Daygroup
         mock:
           type: boolean
           title: Mock
       type: object
       required:
-      - id
-      - treeId
-      - block
       - verdict
       - label
       - predictedClass
@@ -513,12 +206,13 @@ components:
       - inputResolution
       - recommendations
       - stages
-      - createdAt
-      - time
-      - dateLabel
-      - dayGroup
       - mock
       title: ScanResult
+      description: 'The full /predict response. Stateless — no id/timestamp/image-url
+
+        fields, since the service persists nothing; the client owns its own
+
+        history and generates whatever local identifiers it needs.'
     Stage:
       properties:
         index:
@@ -540,48 +234,6 @@ components:
       - title
       - sub
       title: Stage
-    Stats:
-      properties:
-        totalScan:
-          type: integer
-          title: Totalscan
-        totalHealthy:
-          type: integer
-          title: Totalhealthy
-        totalInitialInfection:
-          type: integer
-          title: Totalinitialinfection
-        totalInfected:
-          type: integer
-          title: Totalinfected
-      type: object
-      required:
-      - totalScan
-      - totalHealthy
-      - totalInitialInfection
-      - totalInfected
-      title: Stats
-    ValidationError:
-      properties:
-        loc:
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-          type: array
-          title: Location
-        msg:
-          type: string
-          title: Message
-        type:
-          type: string
-          title: Error Type
-      type: object
-      required:
-      - loc
-      - msg
-      - type
-      title: ValidationError
   securitySchemes:
     APIKeyHeader:
       type: apiKey

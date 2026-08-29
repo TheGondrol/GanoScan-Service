@@ -26,10 +26,6 @@ class Settings(BaseSettings):
     state_dict_name: str = "best_model.pth"
     model_info_name: str = "model_info.json"
 
-    # --- Storage ---
-    db: str = "scans.db"
-    uploads: str = "uploads"
-
     # --- Server ---
     host: str = "0.0.0.0"
     port: int = 5005
@@ -42,14 +38,7 @@ class Settings(BaseSettings):
     imagenet_mean: list[float] = [0.485, 0.456, 0.406]
     imagenet_std: list[float] = [0.229, 0.224, 0.225]
     gamma: float = 0.8              # displayed gamma for the pipeline stage label
-    default_block: str = "Blok C"
     max_mb: int = 15
-
-    # --- Admin / destructive-endpoint guard ---
-    # If set, DELETE /scan/{id} and DELETE /scans require a matching
-    # `X-Admin-Token` header. Unset (default) leaves them open, which is fine
-    # for local dev but should be set before exposing the service publicly.
-    admin_token: str | None = None
 
     # --- API auth (all endpoints except /health and the docs) ---
     # If set, every request needs a matching `X-API-Key` header. Unset
@@ -64,14 +53,6 @@ class Settings(BaseSettings):
     @property
     def model_dir_path(self) -> Path:
         return self._abs(self.model_dir).resolve()
-
-    @property
-    def db_path(self) -> Path:
-        return self._abs(self.db).resolve()
-
-    @property
-    def upload_dir(self) -> Path:
-        return self._abs(self.uploads).resolve()
 
 
 settings = Settings()

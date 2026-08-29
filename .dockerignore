@@ -5,9 +5,6 @@ __pycache__/
 .git/
 .env
 .env.example
-scans.db
-uploads/
-!uploads/.gitkeep
 test_api.py
 README.md
 openapi.yaml

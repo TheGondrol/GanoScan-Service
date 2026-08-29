@@ -1,5 +1,5 @@
-"""Smoke test: generates a throwaway image and exercises every endpoint.
-Run the server first (python app.py), then: python test_api.py"""
+"""Smoke test: generates a throwaway image and exercises the (stateless) API.
+Run the server first, then: python test_api.py [base_url] [api_key]"""
 
 import io
 import sys
@@ -8,12 +8,21 @@ import urllib.request
 
 from PIL import Image
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:5000"
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:5005"
+API_KEY = sys.argv[2] if len(sys.argv) > 2 else ""
 
 
 def _get(path):
-    with urllib.request.urlopen(BASE + path) as r:
+    req = urllib.request.Request(BASE + path, headers=_headers())
+    with urllib.request.urlopen(req) as r:
         return r.status, json.load(r)
+
+
+def _headers(extra: dict | None = None) -> dict:
+    headers = {"X-API-Key": API_KEY} if API_KEY else {}
+    if extra:
+        headers.update(extra)
+    return headers
 
 
 def _post_image(path, color):
@@ -21,7 +30,7 @@ def _post_image(path, color):
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     body, ct = _multipart(buf.getvalue())
-    req = urllib.request.Request(BASE + path, data=body, headers={"Content-Type": ct})
+    req = urllib.request.Request(BASE + path, data=body, headers=_headers({"Content-Type": ct}))
     with urllib.request.urlopen(req) as r:
         return r.status, json.load(r)
 
@@ -43,12 +52,8 @@ def main():
     print("· /health"); print(json.dumps(_get("/health")[1]["model"], indent=2))
     for color in [(40, 120, 60), (170, 90, 40), (200, 200, 120)]:
         status, scan = _post_image("/predict", color)
-        print(f"· /predict ({color}) -> {status} {scan['id']} "
+        print(f"· /predict ({color}) -> {status} {scan['predictedClass']} "
               f"{scan['verdict']} {scan['confidence']:.3f} mock={scan['mock']}")
-        last = scan["id"]
-    print("· /stats", _get("/stats")[1])
-    print("· /history count:", _get("/history")[1]["count"])
-    print(f"· /scan/{last} ->", _get(f"/scan/{last}")[1]["label"])
     print("\nAll endpoints OK ✅")
 
 

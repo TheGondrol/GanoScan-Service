@@ -4,9 +4,6 @@ __pycache__/
 venv/
 .env
 .DS_Store
-scans.db
-uploads/*
-!uploads/.gitkeep
 
 # Model artifacts ARE committed (needed so `docker build` from a plain git
 # clone has something to COPY — Render builds from the repo, not this

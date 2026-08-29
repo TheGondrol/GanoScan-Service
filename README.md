@@ -1,13 +1,14 @@
 # GanoScan Service — Backend API
 
-**FastAPI** backend for the **GanoScan** Android app. It runs the trained
-Ganoderma detection model on uploaded leaf/stem images and stores a scan
-history. Blocking work (model inference, SQLite, disk) is offloaded to a thread
-pool so the async event loop stays responsive; interactive API docs are
-auto-generated at **`/docs`**.
+**FastAPI** backend for the **GanoScan** Android app. It's a **stateless**
+classifier: upload a leaf/stem photo, get back the model's verdict. Nothing is
+persisted server-side — no database, no stored images — the Android app owns
+its own scan history and stats locally on-device. Blocking work (model
+inference) is offloaded to a thread pool so the async event loop stays
+responsive; interactive API docs are auto-generated at **`/docs`**.
 
 It maps the model's **3 classes** (`Healthy`, `Initial Infection`, `Infected`)
-to the app's binary verdict (`HEALTHY` / `INFECTED`) plus a severity
+to the app's verdict (`HEALTHY` / `INFECTED`) plus a severity
 (`none` / `early` / `infected`), confidence, per-class probabilities and care
 recommendations.
 
@@ -78,14 +79,11 @@ Base URL (local): `http://127.0.0.1:5005`
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET`  | `/health` | Service + model status (mode, backbone, classes, accuracy) |
-| `POST` | `/predict` | Multipart image → classify, persist, return the scan |
-| `GET`  | `/history?verdict=&limit=` | Scan list, newest first |
-| `GET`  | `/scan/<id>` | One scan |
-| `GET`  | `/stats` | `{ totalScan, totalHealthy, totalInfected }` |
-| `GET`  | `/uploads/<file>` | The stored original image |
-| `DELETE` | `/scan/<id>` | Delete one scan + its stored photo |
-| `DELETE` | `/scans?verdict=&before=&all=` | Bulk delete (see below) |
+| `POST` | `/predict` | Multipart image → classify, return the result (nothing stored) |
 | `GET`  | `/docs` | Interactive OpenAPI docs (auto-generated) |
+
+That's the whole surface. There's no `/history`, `/stats`, or `/scan/{id}` —
+those live entirely on-device now (Room database in the Android app).
 
 The full contract is checked in at [`openapi.yaml`](openapi.yaml) (OpenAPI
 3.1, validated) — regenerate it after changing any route/schema with:
@@ -103,21 +101,15 @@ Multipart form:
 | Field | Required | Notes |
 |-------|----------|-------|
 | `image` | ✅ | The photo (jpg/png/webp) |
-| `treeId` | — | e.g. `Pohon #A-142` (defaults to `Pohon #<id>`) |
-| `block` | — | e.g. `Blok C` |
 
 ```bash
-curl -F "image=@leaf.jpg" -F "treeId=Pohon #A-142" -F "block=Blok C" \
-     http://127.0.0.1:5005/predict
+curl -F "image=@leaf.jpg" http://127.0.0.1:5005/predict
 ```
 
-Response (`201`):
+Response (`200`):
 
 ```json
 {
-  "id": "A-E58B85",
-  "treeId": "Pohon #A-142",
-  "block": "Blok C",
   "verdict": "INFECTED",
   "label": "Terinfeksi Ganoderma",
   "predictedClass": "Infected",
@@ -135,40 +127,13 @@ Response (`201`):
     { "index": "3", "title": "CNN-Based Enhancement", "sub": "detail tekstur dipertajam" },
     { "index": "✓", "title": "Klasifikasi (CNN)", "sub": "output: Terinfeksi · 0.923", "done": true }
   ],
-  "imageUrl": "/uploads/A-E58B85.jpg",
-  "createdAt": "2026-07-02T23:17:25",
-  "time": "23:17",
-  "dateLabel": "02 Jul · 23:17",
-  "dayGroup": "HARI INI",
   "mock": false
 }
 ```
 
-### `DELETE /scan/<id>` and `DELETE /scans`
-
-Data (`scans.db` rows + their uploaded photos) is never cleaned up on its own —
-delete it explicitly:
-
-```bash
-# one scan
-curl -X DELETE http://127.0.0.1:5005/scan/A-E58B85
-
-# bulk — at least one filter is required, or pass all=true to wipe everything
-curl -X DELETE "http://127.0.0.1:5005/scans?verdict=HEALTHY"
-curl -X DELETE "http://127.0.0.1:5005/scans?before=2026-01-01T00:00:00"
-curl -X DELETE "http://127.0.0.1:5005/scans?all=true"
-```
-
-Both return `{"deleted": <count>}` (or `{"deleted": true, "id": ...}` for the
-single-scan form) and remove the matching `uploads/` photos along with the DB
-rows. `DELETE /scans` with no filters and no `all=true` is rejected with `400`
-so a bare `curl -X DELETE .../scans` can't wipe everything by accident.
-
-If `GANOSCAN_ADMIN_TOKEN` is set (see Configuration below), both endpoints
-require a matching `X-Admin-Token` header, e.g.
-`curl -X DELETE -H "X-Admin-Token: $TOKEN" ...`. **Set this before exposing
-the service publicly** — unset, these endpoints are open to anyone who can
-reach the server.
+The app is responsible for generating its own scan id/timestamp, saving the
+photo to local storage, and inserting the record into its local database —
+none of that is this service's concern anymore.
 
 ---
 
@@ -189,14 +154,14 @@ const val BASE_URL = "http://10.0.2.2:5005/"
 Cleartext HTTP is allowed only for those dev hosts (see the network security
 config); production traffic stays HTTPS-only.
 
-The app degrades gracefully: if the server is unreachable it shows cached data
-and the Processing screen surfaces a "Coba lagi" retry.
+Only `/predict` and `/health` need the network — the app's history, stats, and
+photos all live on-device, so they're available offline even when this
+service isn't reachable.
 
 **API key:** once `GANOSCAN_API_KEY` is set here, the app's
 `ApiClient.API_KEY` constant (same file) must be set to the identical value —
-Retrofit calls and Coil's image loads (`ScanImage` in `ui/components/Common.kt`)
-both attach it as `X-API-Key` automatically. Mismatched or blank keys show up
-as every request failing with 401, including images.
+Retrofit attaches it as `X-API-Key` automatically. Mismatched or blank keys
+show up as every request failing with 401.
 
 ---
 
@@ -220,9 +185,6 @@ All optional — see `.env.example`. Common ones:
 | `GANOSCAN_MODEL_DIR` | `./models` | Where model files live |
 | `GANOSCAN_PORT` | `5005` | Server port |
 | `GANOSCAN_HOST` | `0.0.0.0` | Bind address |
-| `GANOSCAN_DB` | `scans.db` | SQLite path |
-| `GANOSCAN_UPLOADS` | `uploads` | Stored image dir |
-| `GANOSCAN_ADMIN_TOKEN` | unset | If set, required as `X-Admin-Token` on the `DELETE` endpoints |
 | `GANOSCAN_API_KEY` | unset | If set, required as `X-API-Key` on every endpoint except `/health` and the docs |
 
 ---
@@ -234,28 +196,26 @@ Conventional FastAPI package structure:
 ```
 GanoScan Service/
 ├── app/
-│   ├── main.py                 # app factory: lifespan, CORS, static mount, routers
-│   ├── core/config.py          # pydantic-settings (env: GANOSCAN_*)
+│   ├── main.py                 # app factory: lifespan, CORS, routers
+│   ├── core/
+│   │   ├── config.py           # pydantic-settings (env: GANOSCAN_*)
+│   │   └── security.py         # X-API-Key middleware
 │   ├── api/
-│   │   ├── deps.py             # DI (model singleton) + require_admin guard
+│   │   ├── deps.py             # DI (model singleton)
 │   │   ├── router.py           # aggregates routers
 │   │   └── routes/
 │   │       ├── health.py       # GET /health
-│   │       ├── predict.py      # POST /predict
-│   │       └── scans.py        # GET/DELETE /history, /scan/{id}, /stats, /scans
+│   │       └── predict.py      # POST /predict
 │   ├── schemas/scan.py         # Pydantic response models
-│   ├── services/
-│   │   ├── inference.py        # model load / preprocess / predict (random default)
-│   │   ├── model_arch.py       # GanodermaCNN (for best_model.pth)
-│   │   └── verdict.py          # 3-class -> app contract + recommendations
-│   ├── db/store.py             # SQLite scan history
-│   └── utils/scan_meta.py      # id gen + Indonesian date formatting
+│   └── services/
+│       ├── inference.py        # model load / preprocess / predict (random default)
+│       ├── model_arch.py       # GanodermaCNN (for best_model.pth)
+│       └── verdict.py          # 3-class -> app contract + recommendations
 ├── run.py                      # dev entrypoint (uvicorn --reload)
 ├── test_api.py                 # endpoint smoke test
 ├── requirements.txt            # full (with torch/opencv)
 ├── requirements-core.txt       # random-mode only
-├── models/                     # copied in from ../GanoScan Model (gitignored)
-└── uploads/                    # saved originals (gitignored)
+└── models/                     # copied in from ../GanoScan Model (gitignored)
 ```
 
 ## Production note
@@ -263,3 +223,7 @@ GanoScan Service/
 `python run.py` runs Uvicorn with `--reload` (dev). For deployment run without
 reload and add workers, e.g. `uvicorn app.main:app --host 0.0.0.0 --port 5005 --workers 2`,
 or under Gunicorn: `gunicorn -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:5005 app.main:app`.
+
+Being stateless, this service is trivial to scale horizontally (no shared
+disk/DB to coordinate) — any number of instances behind a load balancer work
+fine, since every request is independent.

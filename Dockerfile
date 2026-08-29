@@ -16,8 +16,6 @@ COPY models ./models
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-RUN mkdir -p uploads
-
 EXPOSE 5005
 
 # Render injects $PORT and expects the app to bind to it; default to 5005 for

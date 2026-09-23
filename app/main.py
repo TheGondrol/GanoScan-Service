@@ -11,7 +11,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
-from app.core.config import settings
 from app.core.security import ApiKeyMiddleware
 from app.services.inference import get_model
 
@@ -30,7 +29,14 @@ def create_app() -> FastAPI:
         description="Stateless Ganoderma detection inference for the GanoScan Android app. "
         "Nothing is persisted server-side — the app owns its own scan history.",
         lifespan=lifespan,
-        servers=[{"url": f"http://127.0.0.1:{settings.port}", "description": "Local development"}],
+        # No hardcoded `servers` here on purpose: with it unset, the OpenAPI
+        # doc has no "servers" key at all, and Swagger UI's "Try it out" then
+        # targets whatever origin is currently serving /docs (relative URL) —
+        # correct for both local dev and the deployed Render URL. A hardcoded
+        # http://127.0.0.1:<port> here used to make "Try it out" on the
+        # deployed /docs page send requests to the *tester's own machine*
+        # (and get blocked as mixed content, since the page is HTTPS) instead
+        # of the real server.
     )
     app.add_middleware(
         CORSMiddleware,

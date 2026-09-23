@@ -4,9 +4,6 @@ info:
   description: Stateless Ganoderma detection inference for the GanoScan Android app.
     Nothing is persisted server-side — the app owns its own scan history.
   version: 1.0.0
-servers:
-- url: http://127.0.0.1:5005
-  description: Local development
 paths:
   /health:
     get:

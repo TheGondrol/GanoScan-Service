@@ -4,16 +4,24 @@ uvicorn[standard]==0.30.1
 python-multipart==0.0.9
 pydantic-settings==2.3.4
 Pillow==10.4.0
-numpy==1.26.4
+# NOTE: this full requirements.txt needs numpy>=2 (opencv-python-headless
+# 5.0.0.93 requires it — see below); requirements-core.txt (mock mode only,
+# no opencv/torch) still pins numpy==1.26.4 and that's fine, the two
+# environments are never installed together.
+numpy==2.0.2
 
 # --- ML inference (needed once you drop in a trained model) ---
 # Mock mode runs WITHOUT these. Install them when serving classifier_jit.pt /
 # autoencoder_jit.pt. On Apple Silicon the default wheels use MPS/CPU fine.
 #
 # Pinned to match the versions GanoScan Model's venv used to trace the
-# TorchScript files (torch 2.8.0 / torchvision 0.23.0) — avoids a
-# torch.jit.load() failure on an older runtime, which silently falls back to
-# random mode rather than erroring loudly (see app/services/inference.py).
+# TorchScript files (torch 2.8.0 / torchvision 0.23.0 / numpy 2.0.2) — avoids
+# a torch.jit.load() failure on an older runtime, which silently falls back
+# to random mode rather than erroring loudly (see app/services/inference.py).
+# opencv-python-headless 5.0.0.93 hard-requires numpy>=2 on Python>=3.9, which
+# is why the numpy pin above changed from 1.26.4 — pinning numpy==1.26.4
+# alongside this opencv version makes `pip install -r requirements.txt`
+# unresolvable (verified: this is exactly what broke the first Render build).
 #
 # CPU-only wheel index: on Linux (Docker/Render), plain PyPI `torch` bundles
 # CUDA and is ~5x larger than needed for a CPU-only host. This extra index

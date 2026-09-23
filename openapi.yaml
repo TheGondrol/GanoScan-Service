@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: GanoScan Service
-  description: Stateless Ganoderma detection inference for the GanoScan Android app. Nothing is persisted
-    server-side — the app owns its own scan history.
+  description: Stateless Ganoderma detection inference for the GanoScan Android app.
+    Nothing is persisted server-side — the app owns its own scan history.
   version: 1.0.0
 servers:
 - url: http://127.0.0.1:5005
@@ -13,7 +13,8 @@ paths:
       tags:
       - meta
       summary: Service + model status
-      description: Always reachable without an API key, for load balancer / uptime checks.
+      description: Always reachable without an API key, for load balancer / uptime
+        checks.
       operationId: getHealth
       responses:
         '200':
@@ -27,7 +28,8 @@ paths:
       tags:
       - inference
       summary: Classify an uploaded photo
-      description: 'Classifies the uploaded image and returns the result. Stateless: nothing
+      description: 'Classifies the uploaded image and returns the result. Stateless:
+        nothing
 
         is persisted server-side — the client is responsible for its own history.'
       operationId: predict
@@ -94,7 +96,8 @@ components:
       required:
       - detail
       title: ErrorDetail
-      description: Shape of every error response (FastAPI's default HTTPException body).
+      description: Shape of every error response (FastAPI's default HTTPException
+        body).
     Health:
       properties:
         status:
@@ -144,6 +147,10 @@ components:
           - type: number
           - type: 'null'
           title: Testaccuracy
+        autoencoderLoaded:
+          type: boolean
+          title: Autoencoderloaded
+          default: false
       type: object
       required:
       - mode
@@ -228,6 +235,11 @@ components:
           type: boolean
           title: Done
           default: false
+        image:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image
       type: object
       required:
       - index

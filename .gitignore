@@ -7,11 +7,13 @@ venv/
 
 # Model artifacts ARE committed (needed so `docker build` from a plain git
 # clone has something to COPY — Render builds from the repo, not this
-# machine). Only these 3 exact filenames are tracked; anything else dropped
-# into models/ (e.g. a numbered notebook export like 05_best_model.pth)
+# machine). Only these exact filenames are tracked; anything else dropped
+# into models/ (e.g. a numbered notebook export like 01_classifier_best.pth)
 # stays ignored.
 models/*
 !models/.gitkeep
-!models/model_jit.pt
-!models/best_model.pth
+!models/classifier_jit.pt
+!models/classifier_best.pth
+!models/autoencoder_jit.pt
+!models/autoencoder_best.pth
 !models/model_info.json

@@ -1,26 +1,29 @@
 {
     "model_type": "GanodermaCNN",
     "backbone": "resnet50",
-    "num_classes": 3,
-    "classes": [
-        "Healthy",
-        "Infected",
-        "Initial Infection"
-    ],
-    "image_size": [
-        160,
-        160
-    ],
+    "num_classes": 2,
+    "classes": ["Healthy", "Infected"],
+    "class_scheme": "2 kelas (Healthy vs Infected)",
+    "image_size": [160, 160],
     "pretrained": true,
-    "test_accuracy": 0.7714285714285715,
-    "test_loss": 0.5300519085592694,
-    "training_date": "2026-08-27T20:24:58.017741",
-    "total_parameters": 24689219,
-    "training_config": {
-        "batch_size": 4,
-        "learning_rate": 0.0001,
-        "num_epochs": 100,
-        "optimizer": "AdamW",
-        "weight_decay": 1e-05
+    "test_accuracy": 0.9428571428571428,
+    "test_loss": 0.18834819220420387,
+    "training_date": "2026-09-21T23:11:40.186407",
+    "total_parameters": 24688962,
+    "autoencoder": {
+        "model_type": "EnhancementAutoencoderV2",
+        "total_parameters": 259191,
+        "best_val_loss_l1": 0.04305112361907959,
+        "reconstruction_quality": {
+            "mse_degraded_vs_clean": 0.0036806066986173392,
+            "mse_enhanced_vs_clean": 0.0029133943375200034,
+            "psnr_degraded_vs_clean": 24.34080587808971,
+            "psnr_enhanced_vs_clean": 25.356007282050776
+        }
+    },
+    "classification_impact": {
+        "accuracy_raw_clean": 0.9142857142857143,
+        "accuracy_gamma_degraded": 0.9428571428571428,
+        "accuracy_gamma_degraded_then_enhanced": 0.9714285714285714
     }
 }

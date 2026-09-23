@@ -15,6 +15,7 @@ class Stage(BaseModel):
     title: str
     sub: str
     done: bool = False
+    image: str | None = None  # base64-encoded JPEG, no "data:" prefix; None if not produced
 
 
 class ScanResult(BaseModel):
@@ -43,6 +44,7 @@ class ModelInfo(BaseModel):
     imageSize: list[int]
     device: str
     testAccuracy: float | None = None
+    autoencoderLoaded: bool = False
 
 
 class Health(BaseModel):

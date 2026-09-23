@@ -72,8 +72,10 @@ restart on the server side. Every request is independent.
 
 Render builds from a fresh clone of the repo — it never sees this machine's
 `models/` folder unless it's actually in the repo. `.gitignore` was adjusted
-to allow exactly `models/model_jit.pt`, `models/best_model.pth`, and
-`models/model_info.json` (nothing else that might land in that folder). Both
-weight files are individually under GitHub's 100MB hard limit but over its
-50MB warning threshold — that warning is expected and harmless here. If you
-retrain and the files grow past 100MB, you'd need Git LFS instead.
+to allow exactly `models/classifier_jit.pt`, `models/classifier_best.pth`,
+`models/autoencoder_jit.pt`, `models/autoencoder_best.pth`, and
+`models/model_info.json` (nothing else that might land in that folder). The
+two classifier weight files are individually under GitHub's 100MB hard limit
+but over its 50MB warning threshold — that warning is expected and harmless
+here; the two autoencoder files are ~1MB each, no warning. If you retrain and
+a file grows past 100MB, you'd need Git LFS instead.

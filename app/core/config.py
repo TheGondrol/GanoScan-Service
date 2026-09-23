@@ -22,8 +22,10 @@ class Settings(BaseSettings):
 
     # --- Model artifacts (copied in from the training notebook's output) ---
     model_dir: str = "./models"
-    jit_model_name: str = "model_jit.pt"
-    state_dict_name: str = "best_model.pth"
+    classifier_jit_name: str = "classifier_jit.pt"
+    classifier_state_name: str = "classifier_best.pth"
+    autoencoder_jit_name: str = "autoencoder_jit.pt"
+    autoencoder_state_name: str = "autoencoder_best.pth"
     model_info_name: str = "model_info.json"
 
     # --- Server ---
@@ -32,12 +34,15 @@ class Settings(BaseSettings):
 
     # --- Inference / display ---
     # Fallback only — overridden by models/model_info.json when present.
-    default_classes: list[str] = ["Healthy", "Infected", "Initial Infection"]
+    default_classes: list[str] = ["Healthy", "Infected"]
     default_image_size: tuple[int, int] = (160, 160)  # (height, width)
     default_backbone: str = "resnet50"
     imagenet_mean: list[float] = [0.485, 0.456, 0.406]
     imagenet_std: list[float] = [0.229, 0.224, 0.225]
-    gamma: float = 0.8              # displayed gamma for the pipeline stage label
+    # Gamma correction is a real preprocessing step (not just a display value):
+    # one of these is picked at random for every request, matching the
+    # training notebook's inference_single_image() exactly.
+    gamma_values: list[float] = [0.8, 1.2]
     max_mb: int = 15
 
     # --- API auth (all endpoints except /health and the docs) ---

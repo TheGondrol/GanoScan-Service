@@ -7,14 +7,19 @@ Pillow==10.4.0
 numpy==1.26.4
 
 # --- ML inference (needed once you drop in a trained model) ---
-# Mock mode runs WITHOUT these. Install them when serving model_jit.pt /
-# best_model.pth. On Apple Silicon the default wheels use MPS/CPU fine.
+# Mock mode runs WITHOUT these. Install them when serving classifier_jit.pt /
+# autoencoder_jit.pt. On Apple Silicon the default wheels use MPS/CPU fine.
+#
+# Pinned to match the versions GanoScan Model's venv used to trace the
+# TorchScript files (torch 2.8.0 / torchvision 0.23.0) — avoids a
+# torch.jit.load() failure on an older runtime, which silently falls back to
+# random mode rather than erroring loudly (see app/services/inference.py).
 #
 # CPU-only wheel index: on Linux (Docker/Render), plain PyPI `torch` bundles
 # CUDA and is ~5x larger than needed for a CPU-only host. This extra index
 # only has effect on Linux/Windows; macOS torch wheels are CPU/MPS-only
 # already, so local (.venv) installs are unaffected.
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2
-torchvision==0.17.2
-opencv-python-headless==4.10.0.84
+torch==2.8.0
+torchvision==0.23.0
+opencv-python-headless==5.0.0.93

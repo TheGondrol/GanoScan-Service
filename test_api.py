@@ -52,8 +52,10 @@ def main():
     print("· /health"); print(json.dumps(_get("/health")[1]["model"], indent=2))
     for color in [(40, 120, 60), (170, 90, 40), (200, 200, 120)]:
         status, scan = _post_image("/predict", color)
+        stage_imgs = [bool(s.get("image")) for s in scan.get("stages", [])]
         print(f"· /predict ({color}) -> {status} {scan['predictedClass']} "
-              f"{scan['verdict']} {scan['confidence']:.3f} mock={scan['mock']}")
+              f"{scan['verdict']} {scan['confidence']:.3f} mock={scan['mock']} "
+              f"stage_images={stage_imgs}")
     print("\nAll endpoints OK ✅")
 
 

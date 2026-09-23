@@ -37,10 +37,10 @@ async def predict(
         raise HTTPException(status_code=413, detail=f"image exceeds {settings.max_mb} MB limit")
 
     try:
-        prob_map, predicted, confidence = await run_in_threadpool(model.predict, image_bytes)
+        prob_map, predicted, confidence, pipeline = await run_in_threadpool(model.predict, image_bytes)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"inference failed: {e}")
 
-    result = build_result(prob_map, predicted, confidence, image_bytes, model)
+    result = build_result(prob_map, predicted, confidence, image_bytes, model, pipeline)
     result["mock"] = model.is_random
     return result

@@ -7,10 +7,15 @@ its own scan history and stats locally on-device. Blocking work (model
 inference) is offloaded to a thread pool so the async event loop stays
 responsive; interactive API docs are auto-generated at **`/docs`**.
 
-It maps the model's **3 classes** (`Healthy`, `Initial Infection`, `Infected`)
-to the app's verdict (`HEALTHY` / `INFECTED`) plus a severity
-(`none` / `early` / `infected`), confidence, per-class probabilities and care
-recommendations.
+It maps the model's **2 classes** (`Healthy`, `Infected`) to the app's
+verdict (`HEALTHY` / `INFECTED`) plus a severity (`none` / `infected`),
+confidence, per-class probabilities and care recommendations.
+
+Preprocessing actually runs the training notebook's full pipeline per
+request — **gamma correction** (a random degradation, γ ∈ `{0.8, 1.2}`) →
+**CNN autoencoder enhancement** → ImageNet normalize → classifier — and each
+of the first 3 stages returns its own base64-encoded JPEG (`stages[i].image`)
+so the app can show a real before/after comparison, not just stage labels.
 
 > **Works before training finishes.** With no model files present the service
 > runs in **random mode** (random predictions, no PyTorch needed) so the Android
@@ -42,13 +47,21 @@ python test_api.py http://127.0.0.1:5005
 
 Train in `../GanoScan Model`, then copy its exported artifacts into this
 service's own `models/` folder (renaming away the notebook's numeric prefix,
-e.g. `05_model_jit.pt` → `model_jit.pt`):
+e.g. `01_classifier_jit.pt` → `classifier_jit.pt`). There are now **two**
+models — the classifier and the enhancement autoencoder:
 
 ```bash
-cp "../GanoScan Model/models/05_model_jit.pt"   models/model_jit.pt
-cp "../GanoScan Model/models/05_best_model.pth" models/best_model.pth
-cp "../GanoScan Model/results/05_model_info.json" models/model_info.json
+cp "../GanoScan Model/models/01_classifier_jit.pt"    models/classifier_jit.pt
+cp "../GanoScan Model/models/01_classifier_best.pth"   models/classifier_best.pth
+cp "../GanoScan Model/models/01_autoencoder_jit.pt"    models/autoencoder_jit.pt
+cp "../GanoScan Model/models/01_autoencoder_best.pth"  models/autoencoder_best.pth
 ```
+
+`models/model_info.json` isn't a straight copy — the training project's
+`results/01_model_info.json` uses a nested shape, while this service reads a
+flat one (`classes`, `image_size`, `backbone`, `test_accuracy`). Build it by
+hand from that file's values (see the committed `models/model_info.json` for
+the current example) whenever you retrain.
 
 The service loads from `models/` (self-contained — no dependency on the
 training folder at runtime). Install the ML deps and restart:
@@ -58,8 +71,12 @@ pip install -r requirements.txt   # adds torch, torchvision, opencv
 uvicorn app.main:app --host 0.0.0.0 --port 5005
 ```
 
-Loading priority: **`model_jit.pt`** (TorchScript, recommended) → `best_model.pth`
-(raw weights, rebuilt via `app/services/model_arch.py`) → random. Point elsewhere
+Loading priority, independently for each model: **`classifier_jit.pt`** /
+**`autoencoder_jit.pt`** (TorchScript, recommended) → `classifier_best.pth` /
+`autoencoder_best.pth` (raw weights, rebuilt via `app/services/model_arch.py`)
+→ skipped. The classifier is required for real mode; the autoencoder is
+optional — if missing, the enhancement stage is skipped and a warning is
+logged (`/health`'s `model.autoencoderLoaded` reflects this). Point elsewhere
 with `GANOSCAN_MODEL_DIR=/path/to/models`.
 
 Check what loaded:
@@ -115,25 +132,30 @@ Response (`200`):
   "predictedClass": "Infected",
   "severity": "infected",
   "confidence": 0.9231,
-  "probabilities": {
-    "Healthy": 0.02, "Initial Infection": 0.0569, "Infected": 0.9231
-  },
+  "probabilities": { "Healthy": 0.0769, "Infected": 0.9231 },
   "gamma": 0.8,
   "inputResolution": "1024×768 px",
   "recommendations": ["Tumbang & musnahkan pohon terinfeksi segera", "..."],
   "stages": [
-    { "index": "1", "title": "Citra Asli", "sub": "input 1024×768 px" },
-    { "index": "2", "title": "Gamma Correction", "sub": "γ = 0.8 · kontras dinaikkan" },
-    { "index": "3", "title": "CNN-Based Enhancement", "sub": "detail tekstur dipertajam" },
+    { "index": "1", "title": "Citra Asli", "sub": "input 1024×768 px", "image": "<base64 jpeg>" },
+    { "index": "2", "title": "Gamma Correction", "sub": "γ = 0.8 · kontras diacak", "image": "<base64 jpeg>" },
+    { "index": "3", "title": "CNN-Based Enhancement", "sub": "detail tekstur dipertajam", "image": "<base64 jpeg>" },
     { "index": "✓", "title": "Klasifikasi (CNN)", "sub": "output: Terinfeksi · 0.923", "done": true }
   ],
   "mock": false
 }
 ```
 
+`stages[i].image` (stages 1–3 only) is a base64-encoded JPEG of that
+pipeline step's actual output for this request — no `data:` prefix. It's
+`null` in random/mock mode, since nothing real ran. `gamma` is the value
+that was actually randomly drawn for this request (one of
+`GANOSCAN_GAMMA_VALUES`, default `[0.8, 1.2]`), not a fixed display constant.
+
 The app is responsible for generating its own scan id/timestamp, saving the
-photo to local storage, and inserting the record into its local database —
-none of that is this service's concern anymore.
+photo (and, if it wants to keep them, the stage images) to local storage,
+and inserting the record into its local database — none of that is this
+service's concern anymore.
 
 ---
 
@@ -167,12 +189,25 @@ show up as every request failing with 401.
 
 ## How preprocessing matches training
 
-Inference mirrors the notebook's predictor exactly so results are consistent:
-`cv2` decode → **BGR→RGB** → resize to the model's `image_size` (bilinear) →
-ImageNet normalize (`mean=[0.485,0.456,0.406]`, `std=[0.229,0.224,0.225]`) →
-CHW tensor → `softmax`. Gamma correction was a *training-time* augmentation; the
-notebook feeds the raw normalized image at inference, and so does this service.
-The `gamma` field is surfaced only for the app's "Gamma Correction" stage label.
+Inference mirrors the notebook's `inference_single_image()` exactly, so
+results are consistent — including gamma correction and the autoencoder,
+which really run per request (they used to be preprocessing steps described
+only in the response's stage labels; they're not anymore):
+
+1. `cv2` decode → **BGR→RGB** → resize to the model's `image_size` (bilinear).
+2. **Gamma correction**: γ is picked at random from `GANOSCAN_GAMMA_VALUES`
+   (default `[0.8, 1.2]`) on every request and applied via a `cv2.LUT`
+   gamma table — this matches the notebook's own inference function, which
+   re-degrades every image before enhancing it (the classifier was only ever
+   trained on gamma-degraded → enhanced images, never on raw ones, so this is
+   intentional, not a bug).
+3. **CNN-based enhancement**: the gamma-corrected image (scaled to `[0,1]`)
+   is passed through the frozen `EnhancementAutoencoderV2` U-Net.
+4. ImageNet normalize (`mean=[0.485,0.456,0.406]`, `std=[0.229,0.224,0.225]`)
+   on the enhanced image → CHW tensor → classifier → `softmax`.
+
+Each of steps 1–3 is base64-JPEG-encoded and returned in the matching
+`stages[i].image` field (see the example response above).
 
 ---
 
@@ -185,6 +220,7 @@ All optional — see `.env.example`. Common ones:
 | `GANOSCAN_MODEL_DIR` | `./models` | Where model files live |
 | `GANOSCAN_PORT` | `5005` | Server port |
 | `GANOSCAN_HOST` | `0.0.0.0` | Bind address |
+| `GANOSCAN_GAMMA_VALUES` | `[0.8, 1.2]` | Candidates randomly drawn for the gamma-correction stage on every request |
 | `GANOSCAN_API_KEY` | unset | If set, required as `X-API-Key` on every endpoint except `/health` and the docs |
 
 ---
@@ -208,14 +244,14 @@ GanoScan Service/
 │   │       └── predict.py      # POST /predict
 │   ├── schemas/scan.py         # Pydantic response models
 │   └── services/
-│       ├── inference.py        # model load / preprocess / predict (random default)
-│       ├── model_arch.py       # GanodermaCNN (for best_model.pth)
-│       └── verdict.py          # 3-class -> app contract + recommendations
+│       ├── inference.py        # model load / gamma+AE pipeline / predict (random default)
+│       ├── model_arch.py       # GanodermaCNN + EnhancementAutoencoderV2 (for *_best.pth)
+│       └── verdict.py          # 2-class -> app contract + recommendations
 ├── run.py                      # dev entrypoint (uvicorn --reload)
 ├── test_api.py                 # endpoint smoke test
 ├── requirements.txt            # full (with torch/opencv)
 ├── requirements-core.txt       # random-mode only
-└── models/                     # copied in from ../GanoScan Model (gitignored)
+└── models/                     # copied in from ../GanoScan Model (git-tracked, see .gitignore)
 ```
 
 ## Production note
